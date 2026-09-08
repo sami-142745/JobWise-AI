@@ -158,7 +158,14 @@ export default function Resume() {
             <>
               <h2>Your analyzed profile</h2>
               <p className="muted">
-                {profile.filename} · analyzed just now
+                {profile.filename} · analyzed just now ·{' '}
+                {profile.ai_mode === 'ollama' ? (
+                  <span className="engine-text engine-text--ollama">
+                    analyzed by Ollama
+                  </span>
+                ) : (
+                  <span className="engine-text">analyzed by offline engine</span>
+                )}
               </p>
               <div className="profile-stats">
                 <div>
@@ -178,6 +185,42 @@ export default function Resume() {
                   </span>
                 ))}
               </div>
+              {profile.job_titles?.length > 0 && (
+                <>
+                  <h3>Recent roles</h3>
+                  <p className="muted">{profile.job_titles.join(' · ')}</p>
+                </>
+              )}
+              {profile.career_interests?.length > 0 && (
+                <>
+                  <h3>Career interests</h3>
+                  <div className="chips">
+                    {profile.career_interests.map((interest) => (
+                      <span key={interest} className="chip">
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+              {profile.suggested_roles?.length > 0 && (
+                <>
+                  <h3>Suggested roles</h3>
+                  <div className="chips">
+                    {profile.suggested_roles.map((role) => (
+                      <span key={role} className="chip chip--suggest">
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+              {profile.education && (
+                <>
+                  <h3>Education</h3>
+                  <p className="muted">{profile.education}</p>
+                </>
+              )}
               {profile.summary && (
                 <>
                   <h3>Extracted summary</h3>

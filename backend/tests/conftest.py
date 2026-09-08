@@ -1,10 +1,15 @@
+import os
 import time
 
-from fastapi.testclient import TestClient
+# Force the deterministic offline engine for the whole suite. Ollama-specific
+# behavior is tested separately with mocked responses (see test_ollama.py).
+os.environ["OLLAMA_ENABLED"] = "false"
 
-from app.database import connect
-from app.main import app
-from app.services.seed import seed_jobs
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.database import connect  # noqa: E402
+from app.main import app  # noqa: E402
+from app.services.seed import seed_jobs  # noqa: E402
 
 connect()
 

@@ -82,7 +82,20 @@ export default function Dashboard() {
       {hasProfile && (
         <section>
           <div className="section-head">
-            <h2>Top matches for you</h2>
+            <div>
+              <h2>Top matches for you</h2>
+              <p className="muted">
+                Ranked by{' '}
+                {profile.ai_mode === 'ollama' ? (
+                  <span className="engine-text engine-text--ollama">
+                    your local Ollama model
+                  </span>
+                ) : (
+                  <span className="engine-text">the offline engine</span>
+                )}
+                .
+              </p>
+            </div>
             <Link to="/jobs" className="btn btn-outline btn-sm">
               Browse all jobs
             </Link>

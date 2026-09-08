@@ -47,16 +47,31 @@ app.include_router(resume.router)
 
 @app.get("/")
 def root():
-    return {"message": "AI Job Recommender API", "docs": "/docs", "health": "/health"}
+    return {
+        "message": "AI Job Recommender API",
+        "docs": "/docs",
+        "health": "/health",
+        "ai_status": "/api/ai/status",
+    }
 
 
 @app.get("/health")
 def health():
     from .database import ping
+    from .services.job_service import get_ai_engine_status
+    ai = get_ai_engine_status()
     return {
         "status": "ok" if ping() else "degraded",
         "database": "connected" if ping() else "unreachable",
+        "ai": ai,
     }
+
+
+@app.get("/api/ai/status")
+def ai_status():
+    """Report which AI engine is active (Ollama or offline rules)."""
+    from .services.job_service import get_ai_engine_status
+    return get_ai_engine_status()
 
 
 @app.exception_handler(RequestValidationError)

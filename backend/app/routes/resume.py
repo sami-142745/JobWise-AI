@@ -14,12 +14,15 @@ from ..services.job_service import (
     save_resume,
     serialize_resume,
 )
+from ..services.ai_agent import RecommendationAgent
 from ..utils.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/resume", tags=["resume"])
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".csv"}
+
+_agent = RecommendationAgent()
 
 
 @router.post("/upload", response_model=ResumeProfileOut, status_code=status.HTTP_201_CREATED)
@@ -54,7 +57,12 @@ async def upload_resume(
         parsed_at=resume["parsed_at"],
         skills=resume["skills"],
         years_experience=resume["years_experience"],
-        summary=resume["content"][:300],
+        summary=resume.get("summary", resume["content"][:300]),
+        ai_mode=resume.get("ai_mode", "offline-rules"),
+        job_titles=resume.get("job_titles", []),
+        education=resume.get("education", ""),
+        career_interests=resume.get("career_interests", []),
+        suggested_roles=resume.get("suggested_roles", []),
     )
 
 
@@ -66,19 +74,26 @@ def analyze_resume_text(
     text = (payload.resume_text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Resume text is required.")
+    try:
+        profile = _agent.analyze_resume(text)
+    except AIAgentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     resume = {
         "user_id": user["id"],
         "filename": "text-resume.txt",
         "disk_path": "",
         "content": text,
-        "skills": [],
-        "years_experience": 0.0,
+        "skills": profile["skills"],
+        "years_experience": profile["years_experience"],
+        "summary": profile.get("summary", ""),
+        "job_titles": profile.get("job_titles", []),
+        "education": profile.get("education", ""),
+        "career_interests": profile.get("career_interests", []),
+        "suggested_roles": profile.get("suggested_roles", []),
+        "ai_mode": profile.get("ai_mode", "offline-rules"),
         "parsed_at": datetime.now(timezone.utc),
     }
-    import re
-    from ..services.resume_parser import extract_skills, extract_years_experience
-    resume["skills"] = extract_skills(text)
-    resume["years_experience"] = extract_years_experience(text)
     result = get_db().resumes.insert_one(resume)
     resume["_id"] = result.inserted_id
     users = get_db().users
@@ -94,7 +109,12 @@ def analyze_resume_text(
         parsed_at=serialized["parsed_at"],
         skills=serialized["skills"],
         years_experience=serialized["years_experience"],
-        summary=serialized["content"][:300],
+        summary=serialized.get("summary", serialized["content"][:300]),
+        ai_mode=serialized.get("ai_mode", "offline-rules"),
+        job_titles=serialized.get("job_titles", []),
+        education=serialized.get("education", ""),
+        career_interests=serialized.get("career_interests", []),
+        suggested_roles=serialized.get("suggested_roles", []),
     )
 
 
@@ -113,7 +133,12 @@ def get_profile(user: dict = Depends(get_current_user)):
         parsed_at=serialized["parsed_at"],
         skills=serialized["skills"],
         years_experience=serialized["years_experience"],
-        summary=serialized["content"][:300],
+        summary=serialized.get("summary", serialized["content"][:300]),
+        ai_mode=serialized.get("ai_mode", "offline-rules"),
+        job_titles=serialized.get("job_titles", []),
+        education=serialized.get("education", ""),
+        career_interests=serialized.get("career_interests", []),
+        suggested_roles=serialized.get("suggested_roles", []),
     )
 
 

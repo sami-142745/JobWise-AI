@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
+import AiStatusIndicator from './AiStatusIndicator';
 
 function Brand() {
   return (
@@ -56,6 +57,7 @@ export default function NavBar() {
           My Resume
         </NavLink>
         <span className="navbar-user">{user.full_name}</span>
+        <AiStatusIndicator />
         <button type="button" className="btn btn-outline" onClick={logout}>
           Logout
         </button>

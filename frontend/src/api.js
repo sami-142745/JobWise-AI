@@ -101,4 +101,5 @@ export const api = {
   getResumeProfile: () => request('/api/resume/profile'),
   getRecommendations: (limit = 10) =>
     request(`/api/resume/recommendations?limit=${limit}`),
+  aiStatus: () => request('/api/ai/status'),
 };

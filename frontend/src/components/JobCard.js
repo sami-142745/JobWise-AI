@@ -30,9 +30,23 @@ function SkillChips({ skills, extra = [] }) {
   );
 }
 
+function EngineBadge({ mode }) {
+  if (mode === 'ollama') {
+    return (
+      <span className="engine-badge engine-badge--ollama">Ollama AI</span>
+    );
+  }
+  if (mode === 'offline-rules' || mode === 'offline') {
+    return <span className="engine-badge">Offline engine</span>;
+  }
+  return null;
+}
+
 export default function JobCard({ job, showMatch = false, showApply = false }) {
   const matched = job.matched_skills || [];
   const missing = job.missing_skills || [];
+  const suggested = job.suggested_skills || [];
+  const reasoning = job.ai_reasoning || job.rationale;
 
   return (
     <article className="job-card">
@@ -41,7 +55,9 @@ export default function JobCard({ job, showMatch = false, showApply = false }) {
           <h3 className="job-title">
             <Link to={`/jobs/${job.id}`}>{job.title}</Link>
           </h3>
-          <p className="job-company">{job.company}</p>
+          <p className="job-company">
+            {job.company} <EngineBadge mode={job.ai_mode} />
+          </p>
         </div>
         {showMatch && <MatchScore score={job.match_score} />}
       </div>
@@ -60,22 +76,23 @@ export default function JobCard({ job, showMatch = false, showApply = false }) {
 
       <SkillChips skills={job.skills} />
 
-      {showMatch && (matched.length > 0 || missing.length > 0) && (
+      {showMatch && (matched.length > 0 || missing.length > 0 || suggested.length > 0) && (
         <div className="match-details">
           {matched.length > 0 && (
             <p className="match-good">
               <strong>You match:</strong> {matched.join(', ')}
             </p>
           )}
-          {missing.length > 0 && (
+          {(missing.length > 0 || suggested.length > 0) && (
             <p className="match-gap">
-              <strong>Consider learning:</strong> {missing.join(', ')}
+              <strong>Consider learning:</strong>{' '}
+              {(suggested.length > 0 ? suggested : missing).join(', ')}
             </p>
           )}
         </div>
       )}
 
-      {job.rationale && <p className="job-rationale muted">💡 {job.rationale}</p>}
+      {reasoning && <p className="job-rationale muted">💡 {reasoning}</p>}
 
       <div className="job-card-actions">
         <Link to={`/jobs/${job.id}`} className="btn btn-primary btn-sm">

@@ -32,7 +32,10 @@ class JobMatch(JobOut):
     match_score: float = 0.0
     matched_skills: list[str] = []
     missing_skills: list[str] = []
+    suggested_skills: list[str] = []
     rationale: Optional[str] = None
+    ai_reasoning: Optional[str] = None
+    ai_mode: str = "offline-rules"
 
 
 class ResumeProfileOut(BaseModel):
@@ -42,3 +45,8 @@ class ResumeProfileOut(BaseModel):
     skills: list[str]
     years_experience: float = 0.0
     summary: str = ""
+    ai_mode: str = "offline-rules"
+    job_titles: list[str] = []
+    education: str = ""
+    career_interests: list[str] = []
+    suggested_roles: list[str] = []
