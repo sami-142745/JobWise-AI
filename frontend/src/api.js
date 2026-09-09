@@ -1,5 +1,5 @@
 export const API_URL =
-  process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  process.env.REACT_APP_API_URL || 'https://jobwise-ai-backend-pz3y.onrender.com';
 
 const TOKEN_KEY = 'job_recommender_token';
 
