@@ -1,280 +1,130 @@
-# JobWise AI — AI-Powered Job Recommendation Platform
+# JobWise AI
 
-A full-stack web application that analyzes a user's resume with an AI agent and
-recommends the best matching jobs. Built with **React**, **FastAPI**,
-**MongoDB**, and a **local Ollama LLM** (with automatic offline fallback).
-
-[![Stack](https://img.shields.io/badge/React-19-blue)](https://react.dev)
-[![Backend](https://img.shields.io/badge/FastAPI-0.115-orange)](https://fastapi.tiangolo.com)
-[![DB](https://img.shields.io/badge/MongoDB-green)](https://mongodb.com)
-[![Python](https://img.shields.io/badge/Python-3.11-blueviolet)](https://python.org)
-[![AI](https://img.shields.io/badge/AI-Ollama-purple)](https://ollama.com)
-[![Tests](https://img.shields.io/badge/tests-40%20backend%20%2B%204%20frontend-brightgreen)](#running-the-tests)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-
-## Quick start
-
-> Requires: Python 3.10+, Node 18+, a running MongoDB server, and (recommended)
-> a local [Ollama](https://ollama.com) installation with a model pulled, e.g.
-> `ollama pull qwen2.5-coder:7b`.
-
-```bash
-# 1. Backend  — http://localhost:8000  (API docs at /docs)
-cd backend
-pip install -r requirements.txt
-python run.py
-
-# 2. Frontend — http://localhost:3000 (in a second terminal)
-cd frontend
-npm install
-npm start
-```
-
-Open **http://localhost:3000**, create an account, upload a resume, and view
-your AI job recommendations. The API seeds a sample job catalogue on startup.
-If Ollama is installed, resume analysis and recommendations are powered by the
-local model — otherwise the app transparently falls back to the built-in
-rule-based engine (shown in the navbar's AI status indicator).
+**An AI-powered, resume-based job recommendation platform — React + FastAPI + MongoDB, with local Ollama LLM inference and automatic offline fallback.**
 
 ---
 
-## Features
+## Project Overview
 
-- **User registration & login** — secure JWT-based authentication with
-  bcrypt-hashed passwords (`backend/app/routes/auth.py`).
-- **AI resume analysis** — an agent (`backend/app/services/ai_agent.py`) that
-  extracts skills, years of experience, a summary, recent roles, education,
-  career interests, and suggested roles from an uploaded resume (PDF, DOCX, or
-  TXT, plus paste-as-text). Powered by a **local Ollama model** with an
-  automatic **offline rule-based fallback**.
-- **Job matching engine** — every job is scored against the candidate profile
-  (skill coverage, experience level fit, and location) and ranked with an
-  explainable match percentage and rationale. When Ollama is available, the
-  top candidates are re-ranked with LLM-written reasoning and skill
-  suggestions.
-- **Job search** — browse, search by keyword/location, view details, and open
-  external applications.
-- **Dashboard** — personalized top matches, profile statistics, and an AI
-  status indicator showing whether Ollama or the offline engine is active.
-- **Resume management** — upload, drag-and-drop, re-analyse, and view the
-  extracted profile.
+JobWise AI analyzes a candidate's resume and recommends the jobs they fit best. A user registers, uploads (or pastes) their resume, and the system extracts their skills, experience, current role, education, career interests, and suggested roles. Each job in the catalogue is then scored against that profile and ranked by fit, with an explainable match percentage, a human-readable rationale, and actionable skill suggestions.
+
+The "AI" is a **local Ollama model** (`qwen2.5-coder:7b` by default) that enriches resume analysis and writes per-job reasoning — with no API keys and no cloud dependency. When Ollama is unavailable, slow, or disabled, the application seamlessly falls back to a built-in rule-based engine, so the platform **always works offline**.
+
+The API exposes clean **REST endpoints** (JWT-secured) with interactive OpenAPI documentation, and ships with **automated backend and frontend tests**.
+
+## Key Features
+
+- **React single-page application** — fast, modern UI (Welcome, Login, Register, Dashboard, Browse Jobs, Job Detail, Resume) with client-side routing and authenticated views.
+- **FastAPI REST backend** — typed, self-documenting API with interactive docs at `/docs`, consistent JSON errors, and a global exception handler.
+- **MongoDB persistence** — users, resume profiles, and the job catalogue stored in MongoDB with auto-created indexes.
+- **Authentication & authorization** — JWT-based login/registration with **bcrypt-hashed passwords**; protected endpoints and route guards.
+- **AI-powered resume analysis** — extracts skills, years of experience, a summary, recent roles, education, career interests, and suggested roles from a PDF, DOCX, or TXT resume (or pasted text).
+- **Intelligent job matching** — every job is scored by skill coverage, experience fit, and location, then ranked with an explainable match percentage and skill-gap analysis.
+- **Ollama LLM integration** — a local `qwen2.5-coder:7b` model provides enriched analysis, LLM-written reasoning, and suggested skills for the top matches.
+- **Offline AI fallback** — if Ollama is disabled, unreachable, times out, or returns invalid JSON, the deterministic rule-based engine handles the request; the active engine is surfaced in the UI.
+- **Job search & browse** — keyword and location search, job details, and links to external applications.
+- **Dashboard** — personalized top matches, profile statistics, and an AI status indicator.
+- **Resume management** — drag-and-drop upload, re-analysis, paste-as-text, and a view of the extracted profile.
 - **Seed data** — the API seeds a realistic job catalogue on startup.
-- **Tests & error handling** — 40 backend tests (Ollama is mocked in tests,
-  never required) plus frontend smoke tests, and consistent JSON error
-  responses (401/404/409/413/422/503) with a global error handler.
+- **Automated tests** — 40 backend tests (Ollama fully mocked) and 4 frontend tests; CI-friendly build script.
+- **Git-ignored secrets & uploads** — `.env`, uploaded resume files, and runtime data are never committed.
 
----
+## Tech Stack
 
-## Architecture
-
-```
-┌───────────────┐  HTTP/JSON (JWT)   ┌─────────────────┐   pymongo   ┌─────────┐
-│  React SPA    │ ─────────────────> │   FastAPI API   │ ──────────> │ MongoDB │
-│  (port 3000)  │ <───────────────── │  (port 8000)   │ <────────── │         │
-└───────────────┘                    └────────┬────────┘             └─────────┘
-                                              │
-                                   ┌──────────┴──────────┐
-                                   │  AI Agent services  │
-                                   │  resume analysis    │
-                                   │  job matching       │
-                                   └──────┬───────┬──────┘
-                                          │       │ (HTTP)   ┌────────────┐
-                                          │       └────────> │   Ollama   │
-                                          │                  │ local model │
-                                          │                  │ :11434      │
-                                          │                  └────────────┘
-                                          └── offline fallback (JobMatcher)
-```
-
-### Backend layout
-
-| Path | Purpose |
-| --- | --- |
-| `backend/app/main.py` | FastAPI app, CORS, global error handlers, health check |
-| `backend/app/config.py` | Environment-based settings |
-| `backend/app/database.py` | MongoDB connection + index creation |
-| `backend/app/models/` | Pydantic request/response schemas |
-| `backend/app/routes/` | `auth`, `jobs`, `resume` API endpoints |
-| `backend/app/services/ai_agent.py` | The recommendation agent & matcher (Ollama + fallback) |
-| `backend/app/services/ollama_service.py` | Ollama HTTP client, JSON parsing, availability probe |
-| `backend/app/services/resume_parser.py` | Skill/experience extraction |
-| `backend/app/services/file_reader.py` | PDF / DOCX / TXT text extraction |
-| `backend/app/services/seed.py` | Seed job catalogue |
-| `backend/app/utils/auth.py` | Password hashing, JWT, current-user dependency |
-| `backend/tests/` | pytest suite (40 tests; Ollama fully mocked) |
-
-### Frontend layout
-
-| Path | Purpose |
-| --- | --- |
-| `frontend/src/App.js` | Routes + auth provider |
-| `frontend/src/api.js` | Centralized API client & token handling |
-| `frontend/src/context/AuthContext.js` | Auth state (login/logout/session) |
-| `frontend/src/components/` | NavBar, JobCard, ProtectedRoute, Spinner, Alert |
-| `frontend/src/pages/` | Welcome, Login, Register, Dashboard, Jobs, JobDetail, Resume |
-
----
-
-## Requirements
-
-- Python 3.10+
-- Node.js 18+
-- MongoDB running locally on `localhost:27017` (or a `MONGO_URI` you supply)
-- Optional: [Ollama](https://ollama.com) with a model pulled (default
-  `qwen2.5-coder:7b`) — the app falls back to the offline engine without it
-
----
-
-## Getting started
-
-### 1. MongoDB
-
-Make sure MongoDB is running:
-
-```bash
-mongod --dbpath /path/to/data
-```
-
-or, on Windows, start the service:
-
-```powershell
-Start-Service MongoDB
-```
-
-### 2. Backend
-
-```bash
-cd backend
-python -m venv .venv
-.\.venv\Scripts\activate        # Windows
-# source .venv/bin/activate     # macOS / Linux
-
-pip install -r requirements.txt
-
-# Optional: configure via environment (see backend/.env.example)
-copy .env.example .env          # Windows
-# cp .env.example .env          # macOS / Linux
-
-python run.py                   # starts API on http://localhost:8000
-```
-
-The API will:
-
-- connect to MongoDB and create indexes,
-- seed a catalogue of sample jobs,
-- serve interactive docs at `http://localhost:8000/docs`.
-
-### 2a. Ollama (recommended)
-
-The AI agent uses a local [Ollama](https://ollama.com) model for resume
-analysis and job recommendations. There is no API key — everything runs on
-your machine.
-
-```bash
-# install Ollama, then pull the default model
-ollama pull qwen2.5-coder:7b
-
-# verify the server responds
-curl http://localhost:11434/api/tags
-```
-
-> ⚠️ The app **works without Ollama too**: if it's not running or times out,
-> the request falls back to the built-in rule-based agent (`JobMatcher`).
-> Disable it entirely with `OLLAMA_ENABLED=false`. The navbar shows the active
-> engine via `GET /api/ai/status`.
-
-### 3. Frontend
-
-In a second terminal:
-
-```bash
-cd frontend
-npm install
-npm start                       # starts UI on http://localhost:3000
-```
-
-Open **http://localhost:3000** — create an account, upload a resume, and view
-your AI job recommendations.
-
-> The frontend uses the API at `http://localhost:8000` (set via the
-> `REACT_APP_API_URL` environment variable). The `package.json` proxy also
-> forwards `/api` requests to the backend during development.
-
----
-
-## Configuration
-
-All backend settings are read from environment variables (a template ships at
-`backend/.env.example`):
-
-| Variable | Default | Description |
+| Layer | Technology | Role |
 | --- | --- | --- |
-| `MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection string |
-| `DATABASE_NAME` | `job_recommender` | MongoDB database name |
-| `SECRET_KEY` | placeholder | JWT signing key — **must change in production** |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` | JWT lifetime (24h) |
-| `OLLAMA_ENABLED` | `true` | Use local Ollama; falls back when unreachable |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `qwen2.5-coder:7b` | Model used for analysis & ranking |
-| `OLLAMA_TIMEOUT` | `300` | Request timeout (seconds) — first cold load is slow |
-| `OLLAMA_MAX_TOKENS` | `2048` | Max tokens in the model response |
-| `OLLAMA_TEMPERATURE` | `0.2` | Sampling temperature (lower = more deterministic) |
-| `UPLOAD_DIR` | `uploads` | Where uploaded resumes are stored (git-ignored) |
-| `MAX_UPLOAD_SIZE_MB` | `10` | Max resume file size |
-| `SEED_JOBS` | `1` | Seed sample jobs at startup (set `0` to disable) |
-| `CORS_ORIGINS` | `localhost:3000` | Allowed browser origins |
+| Frontend | **React 19**, React Router 6 | SPA, routing, protected routes, state via context |
+| Build tooling | Create React App (react-scripts 5) | Dev server, bundling, tests (Jest + Testing Library) |
+| Backend | **FastAPI** (Python 3.10+), Uvicorn | REST API, validation (Pydantic v2), async server |
+| Database | **MongoDB** (pymongo) | Users, resume profiles, job catalogue |
+| AI / LLM | **Ollama** — local **`qwen2.5-coder:7b`** | Resume enrichment, recommendation reasoning |
+| Auth | PyJWT + bcrypt | JWT access tokens, password hashing |
+| File parsing | pypdf, python-docx | PDF / DOCX / TXT resume text extraction |
+| Testing | pytest + HTTPX, Jest + Testing Library | Backend (40 tests) and frontend (4 tests) suites |
 
-Frontend: `REACT_APP_API_URL` (default `http://localhost:8000`).
+> Development environment used: Python 3.11, Node 24, MongoDB on `localhost:27017`, Ollama `0.33.x` with `qwen2.5-coder:7b`.
 
----
+## System Architecture
 
-## Screenshots
-
-*Add screenshots here by placing images in `docs/screenshots/` and referencing
-them, e.g.*
-
-```markdown
-![Dashboard](docs/screenshots/dashboard.png)
+```
+┌────────────────┐   HTTP/JSON (Bearer JWT)   ┌──────────────────┐   pymongo   ┌──────────┐
+│   React SPA    │ ─────────────────────────> │   FastAPI API    │ ─────────> │  MongoDB │
+│  (port 3000)   │ <───────────────────────── │   (port 8000)    │ <───────── │          │
+└────────────────┘                            └────────┬─────────┘             └──────────┘
+                                                        │
+                                             ┌──────────┴──────────┐
+                                             │   AI agent services │
+                                             │  resume analysis    │
+                                             │  job matching       │
+                                             └──────┬───────┬──────┘
+                                                    │       │  REST (HTTP)
+                                                    │       └──────────────►  Ollama
+                                                    │                          (port 11434)
+                                                    │                      local qwen2.5-coder:7b
+                                                    └── offline fallback
+                                                        (rule-based JobMatcher)
 ```
 
----
+Flow in one line: the browser calls the React app, the React app calls the FastAPI REST API, the API reads/writes MongoDB, and the AI agent services call the local Ollama model — or the built-in offline matcher when the model isn't reachable.
 
-## Running the tests
+## How the Application Works
 
-```bash
-cd backend
-python -m pytest tests -v
+1. **Create an account** — register or log in to obtain a JWT; the token is stored and sent with every request.
+2. **Add your resume** — upload a PDF/DOCX/TXT file (drag‑and‑drop) or paste the text.
+3. **Profile extraction** — the backend immediately parses the resume: first with a fast, deterministic offline parser (`resume_parser.py`), then enriched by the Ollama model when available. The result is stored as your resume profile.
+4. **Job matching** — your profile is scored against every job in the catalogue using the offline matcher's weighted formula (see §8), producing a baseline ranking instantly.
+5. **AI ranking (when available)** — the top candidates are sent to Ollama, which returns an adjusted score, a written reason, matched/missing skills, and `suggested_skills`. Enriched results are ranked first.
+6. **Explore** — the Dashboard shows your top matches and profile stats; Browse Jobs lets you search by keyword/location and open external applications.
+7. **Improve with feedback** — every recommendation shows why you match, where you fall short, and what to learn next.
+
+## AI/Ollama Integration
+
+- **Local and private** — no API keys, no cloud round-trips; the model runs on your machine via [Ollama](https://ollama.com).
+- **Default model** — `qwen2.5-coder:7b` (configure with `OLLAMA_MODEL`).
+- **Client layer** (`backend/app/services/ollama_service.py`) — an HTTP client for the Ollama REST API (`/api/tags`, `/api/generate`) with:
+  - an **availability probe** that is cached for 15 seconds so status checks stay fast;
+  - **robust JSON extraction** that tolerates surrounding prose and markdown
+    code fences around the model's JSON response;
+  - configurable timeout, max tokens, and temperature.
+- **Structured prompts** — resume analysis and recommendation calls use strict "JSON only" system prompts so the raw text can be validated and merged deterministically.
+- **Engine reporting** — `GET /api/ai/status` returns the active engine (`ollama` vs `offline-rules`), the configured model, and the pulled models list. The same info is folded into `GET /health`, and the frontend shows a live status pill in the navbar (polled every 30 seconds).
+- **Test isolation** — every test that exercises the Ollama paths uses mocked responses; not a single test requires a real model server.
+
+## Resume Analysis and Job Matching
+
+**Resume analysis** (`file_reader.py` → `resume_parser.py` → `ai_agent.py`):
+
+1. Text is extracted from the uploaded file (pypdf for PDF, python-docx for DOCX, plain text for TXT).
+2. The offline parser matches the text against a skills taxonomy and estimates years of experience from date ranges and explicit statements.
+3. When Ollama is enabled and reachable, the model receives the same resume and returns structured JSON — skills, years, roles, education, interests, and suggested roles — which is merged with (and deduplicated against) the offline result.
+4. The final profile (`ResumeProfileOut`) exposes `ai_mode` so clients know which engine produced it.
+
+**Job matching** (`ai_agent.py`):
+
+- `JobMatcher` computes a baseline score for every job:
+
+```
+score = 60% · skill coverage + 25% · experience fit + 15% · location fit
 ```
 
-The tests use a real MongoDB instance (wiping `users`/`resumes` collections and
-re-seeding jobs for a deterministic run). 40 tests cover authentication, job
-search/CRUD, resume upload & parsing, recommendations, and the Ollama
-integration. **Ollama is always mocked** in tests (`tests/test_ollama.py`) —
-the deterministic suites force the offline engine, and no test ever calls a
-real model server.
+- Each job returns `match_score` (0–100), `matched_skills`, `missing_skills`, and a clear `rationale`.
+- When Ollama is available, the top candidates (capped to keep the request fast) are sent to the model, which returns a re-scored set with an `ai_reasoning` explanation and `suggested_skills` to close the gap. Enriched results are ranked ahead of the rest.
+- Every result — Ollama or offline — carries the shared fields, so the frontend renders identically regardless of engine.
 
-### Frontend smoke tests
+## API Endpoints
 
-```bash
-cd frontend
-CI=true npm test -- --watchAll=false     # 4 tests (routing + JobCard AI fields)
-```
-
----
-
-## API reference (summary)
-
-Interactive OpenAPI docs: `http://localhost:8000/docs`
+Interactive OpenAPI documentation: **`http://localhost:8000/docs`**
 
 | Method | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
-| GET  | `/health` | – | Health check (incl. database + AI engine status) |
-| GET  | `/api/ai/status` | – | Active AI engine info (Ollama vs offline) |
+| GET  | `/` | – | Service info, links to docs/health/status |
+| GET  | `/health` | – | Health check (database + AI engine status) |
+| GET  | `/api/ai/status` | – | Active AI engine, configured model, pulled models |
 | POST | `/api/auth/register` | – | Create account → returns JWT |
-| POST | `/api/auth/login` | – | Login → returns JWT |
+| POST | `/api/auth/login` | – | Log in → returns JWT |
 | GET  | `/api/auth/me` | ✓ | Current user profile |
-| GET  | `/api/jobs` | ✓ | List jobs (`?q=`, `?location=`) |
-| GET  | `/api/jobs/search?q=python` | ✓ | Keyword search |
+| GET  | `/api/jobs` | ✓ | List jobs (`?q=` keyword, `?location=`) |
+| GET  | `/api/jobs/search` | ✓ | Keyword + location search |
 | GET  | `/api/jobs/{id}` | ✓ | Job detail |
 | POST | `/api/jobs` | ✓ | Create a job |
 | POST | `/api/resume/upload` | ✓ | Upload resume file (PDF/DOCX/TXT) |
@@ -282,7 +132,9 @@ Interactive OpenAPI docs: `http://localhost:8000/docs`
 | GET  | `/api/resume/profile` | ✓ | Latest extracted resume profile |
 | GET  | `/api/resume/recommendations` | ✓ | Ranked job matches for the user |
 
-### Sample recommendation response
+Authenticated endpoints return HTTP `401` without a valid Bearer token. The API centralizes error handling for `500` (unexpected), `503` (database down), and Pydantic `422` (validation) responses.
+
+### Example: recommendation result
 
 ```json
 {
@@ -299,88 +151,199 @@ Interactive OpenAPI docs: `http://localhost:8000/docs`
 }
 ```
 
-> `ai_mode` is `"ollama"` when the result came from the local model and
-> `"offline-rules"` when the fallback engine produced it. `ai_reasoning` is
-> the LLM's explanation (null in offline mode, where `rationale` is used).
+> `ai_mode` is `"ollama"` when the result came from the local model and `"offline-rules"` when the fallback engine produced it. `ai_reasoning` is the LLM's explanation (null in offline mode, where `rationale` is used).
 
----
-
-## How the AI agent works
-
-The agent (`backend/app/services/ai_agent.py`) always produces a deterministic
-result first, then enriches it with the local LLM when possible:
-
-1. **Resume parsing** (`file_reader.py`) — extracts text from the uploaded
-   file.
-2. **Offline profile extraction** (`resume_parser.py`) — matches the text
-   against a skills taxonomy and estimates years of experience from date
-   ranges and explicit statements. This is the baseline that is always
-   available.
-3. **Ollama enrichment** — when enabled and reachable, the same resume is sent
-   to the local model (`ollama_service.py`) which returns structured JSON
-   (skills, years, roles, education, interests, suggested roles). The offline
-   profile and LLM output are merged (deduplicated).
-4. **Scoring** (`ai_agent.py`) — `JobMatcher` scores every job using a
-   weighted formula:
+## Project Structure
 
 ```
-score = 60% · skill coverage + 25% · experience fit + 15% · location fit
+jobwise-ai/
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI app, CORS, error handlers, /health, /api/ai/status
+│   │   ├── config.py            # Environment-based settings (incl. Ollama)
+│   │   ├── database.py          # MongoDB connection + index creation
+│   │   ├── models/              # Pydantic schemas (Token, User, Job, JobMatch, ResumeProfile)
+│   │   ├── routes/              # auth.py · jobs.py · resume.py
+│   │   ├── services/
+│   │   │   ├── ai_agent.py      # RecommendationAgent + JobMatcher (Ollama + fallback)
+│   │   │   ├── ollama_service.py# Ollama HTTP client, JSON parsing, availability probe
+│   │   │   ├── resume_parser.py # Offline skill/experience extraction
+│   │   │   ├── file_reader.py   # PDF / DOCX / TXT text extraction
+│   │   │   ├── seed.py          # Seed job catalogue
+│   │   │   └── job_service.py   # Resume/Job business logic + AI status helper
+│   │   └── utils/auth.py        # Password hashing, JWT, current-user dependency
+│   ├── tests/                   # 40 pytest tests (Ollama mocked)
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── run.py                   # Dev entrypoint (port 8000)
+└── frontend/
+    ├── src/
+    │   ├── App.js               # Routes + AuthProvider + layout
+    │   ├── api.js               # Central API client, token handling
+    │   ├── context/AuthContext.js
+    │   ├── components/          # NavBar, AiStatusIndicator, JobCard, ProtectedRoute, Spinner, Alert
+    │   └── pages/               # Welcome, Login, Register, Dashboard, Jobs, JobDetail, Resume, NotFound
+    ├── public/
+    ├── package.json
+    └── src/setupTests.js, *.test.js  # Jest + Testing Library tests
 ```
 
-5. **Ollama ranking** — the top candidates are sent to the model, which
-   returns per-job `match_score`, a written `reason`, matched/missing skills,
-   and `suggested_skills`. These are spliced onto the results; enriched
-   entries are ranked first.
-6. **Fallback** — if Ollama is disabled, unreachable, times out, or returns
-   invalid JSON, the offline results are returned unchanged. The app never
-   depends on the model being available.
-7. **Ranking** — results are sorted descending (Ollama-enriched first) and
-   returned with `rationale`, `ai_reasoning`, and skill gap analysis
-   (matched/missing/suggested) so users know how to improve.
+## Installation and Setup
 
----
+**Prerequisites:** Python 3.10+, Node 18+, MongoDB running locally, and (recommended) [Ollama](https://ollama.com).
 
-## Troubleshooting
+### MongoDB
 
-| Problem | Fix |
-| --- | --- |
-| `ServerSelectionTimeoutError` / `could not connect to MongoDB` | Ensure MongoDB is running (see step 1). |
-| `ModuleNotFoundError` | `pip install -r requirements.txt` in the activated venv. |
-| Frontend API calls failing | Confirm the backend is on port 8000, or set `REACT_APP_API_URL`. |
-| 401 on all endpoints | Log in again — your JWT may have expired. |
-| Analysis/recommendations slow on first use | Ollama loads a cold model — `OLLAMA_TIMEOUT` defaults to 300s and the model stays warm after the first call. |
-| Navbar shows "Offline engine" | Ollama isn't running (`ollama serve`), the model isn't pulled, or `OLLAMA_ENABLED=false`. Check `GET /api/ai/status` and `ollama list`. |
-| `Ollama is online but '…' is not pulled yet` | Run `ollama pull qwen2.5-coder:7b` (or set `OLLAMA_MODEL` to a model you have). |
-| Scanned-image PDF upload | Parsing requires text-based PDFs; export to text/DOCX first. |
-| `password cannot be longer than 72 bytes` (old pip installs) | Ensure `bcrypt>=4.1` from `requirements.txt`; passlib-free hashing is used. |
+```bash
+mongod --dbpath /path/to/data        # or, on Windows:
+Start-Service MongoDB                # PowerShell
+```
 
----
+### Backend
 
-## Security notes
+```bash
+cd backend
+python -m venv .venv
+.\.venv\Scripts\activate             # Windows
+# source .venv/bin/activate          # macOS / Linux
 
-- Passwords are hashed with **bcrypt** (SHA-256 pre-hash keeps any length
-  safe).
-- JWTs are signed with `SECRET_KEY` — **change it** in production.
-- CORS is locked to the local dev origin; update `CORS_ORIGINS` for other
-  origins.
-- Set `MONGO_URI`, `SECRET_KEY`, and Ollama settings via the environment, not
-  the repository.
-- Ollama runs as a local service on `localhost:11434`; in production, bind it
-  to localhost only and don't expose it publicly.
+pip install -r requirements.txt
+
+# Optional: configure via environment (see backend/.env.example)
+copy .env.example .env               # Windows
+# cp .env.example .env               # macOS / Linux
+```
+
+### Ollama (recommended)
+
+```bash
+# install Ollama, then pull the default model
+ollama pull qwen2.5-coder:7b
+
+# verify the local server responds
+curl http://localhost:11434/api/tags
+```
+
+> The app works without Ollama. If it's not running or times out, requests fall back to the built-in rule-based engine. Disable it entirely with `OLLAMA_ENABLED=false`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+```
+
+## Environment Variables
+
+All backend settings are read from environment variables (template: `backend/.env.example`):
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection string |
+| `DATABASE_NAME` | `job_recommender` | MongoDB database name |
+| `SECRET_KEY` | placeholder | JWT signing key — **must change in production** |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` | JWT lifetime (24 h) |
+| `OLLAMA_ENABLED` | `true` | Use local Ollama; falls back when unreachable |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_MODEL` | `qwen2.5-coder:7b` | Model used for analysis & ranking |
+| `OLLAMA_TIMEOUT` | `300` | Request timeout (s) — first cold load is slow |
+| `OLLAMA_MAX_TOKENS` | `2048` | Max tokens in the model response |
+| `OLLAMA_TEMPERATURE` | `0.2` | Sampling temperature (lower = more deterministic) |
+| `UPLOAD_DIR` | `uploads` | Where uploaded resumes are stored (git-ignored) |
+| `MAX_UPLOAD_SIZE_MB` | `10` | Max resume file size |
+| `SEED_JOBS` | `1` | Seed sample jobs at startup (`0` disables) |
+| `CORS_ORIGINS` | `localhost:3000` | Allowed browser origins |
+
+**Frontend:** `REACT_APP_API_URL` (default `http://localhost:8000`). During development the `package.json` proxy also forwards `/api` to the backend.
+
+## Running the Application
+
+**Backend** (terminal 1):
+
+```bash
+cd backend
+python run.py                        # API on http://localhost:8000 · docs at /docs
+```
+
+On startup the API connects to MongoDB, creates indexes, and seeds the sample job catalogue.
+
+**Frontend** (terminal 2):
+
+```bash
+cd frontend
+npm start                            # UI on http://localhost:3000
+```
+
+Open **http://localhost:3000**, create an account, upload a resume, and view your AI job recommendations on the Dashboard.
+
+**Production build (frontend):**
+
+```bash
+cd frontend
+npm run build                        # optimized static bundle in frontend/build
+```
+
+## Testing
+
+**Backend** (requires a running MongoDB; uses a real instance like the app):
+
+```bash
+cd backend
+python -m pytest tests -v
+```
+
+- **40 tests** covering authentication, job search/CRUD, resume upload & parsing, recommendations, and the Ollama integration.
+- The suite wipes `users`/`resumes` and re-seeds jobs for a deterministic run.
+- **Ollama is always mocked** (`tests/test_ollama.py`); the deterministic suites force the offline engine, so no test ever calls a real model server.
+
+**Frontend** (Jest + Testing Library):
+
+```bash
+cd frontend
+CI=true npm test -- --watchAll=false  # 4 tests (routing smoke + JobCard AI fields)
+```
+
+## Security Notes
+
+- Passwords are hashed with **bcrypt** (SHA-256 pre-hash keeps passwords of any length safe).
+- JWTs are signed with `SECRET_KEY` — **change it in production**.
+- CORS is locked to the local dev origin; update `CORS_ORIGINS` for any other origin you trust.
+- Secrets (`MONGO_URI`, `SECRET_KEY`) are supplied via environment variables, never committed.
+- Uploaded resume files are stored in a git-ignored directory.
+- Ollama runs as a local service on `localhost:11434` — in production, keep it bound to localhost and do not expose it publicly.
+
+## AI Offline Fallback
+
+The system is designed so the model is an *enhancement*, never a dependency:
+
+1. **Always available baseline** — every analysis and recommendation first runs through the deterministic offline parser and `JobMatcher`; results are ready immediately.
+2. **Optional enrichment** — the same request is upgraded with the Ollama model only when it is enabled, reachable, and responsive.
+3. **Graceful degradation** — if Ollama is disabled, offline, times out, or returns unparsable JSON, the offline result is returned unchanged (a fallback decision is logged and the response's `ai_mode` reads `offline-rules`).
+4. **Transparency** — `GET /api/ai/status` (`status` / `engine` / `model`), the `/health` AI block, and the navbar indicator all tell the user which engine served the result.
+5. **Safety-first defaults** — a generous `OLLAMA_TIMEOUT` (300 s) covers cold model loads; the top-candidate cap and token limits keep prompts lean; tests prove the fallback path with simulated failures.
+
+Result: the platform fully works with **no** model installed, and gets smarter when Ollama is present.
+
+## Future Enhancements
+
+*Roadmap — none of these are implemented yet.*
+
+- Resume up-skilling plans generated per candidate (a learning path built from `suggested_skills` gaps).
+- More file formats (e.g., OCR for scanned PDFs).
+- Saved job alerts / email or in-app notifications on new matches.
+- Cloud deployment guide (containerized API + managed MongoDB) for production hosting.
+- Swappable model configurations and a benchmark of recommendation quality across models.
+- Candidate-preferences UI (locations, roles, salary filters) feeding the matcher.
 
 ---
 
 ## Contributing
 
-Contributions are welcome!
-
 1. Fork the repository and create a feature branch.
-2. Make your changes; keep the code style consistent.
-3. Run the backend tests: `cd backend && python -m pytest tests -v`
+2. Keep the code style consistent.
+3. Run backend tests: `cd backend && python -m pytest tests -v`
 4. Verify the frontend builds: `cd frontend && npm run build`
-5. Open a pull request describing the change and any test results.
-
----
+5. Open a pull request describing the change and test results.
 
 ## License
 
